@@ -49,6 +49,8 @@ namespace MCIRecorder
 
         private Stopwatch _stopwatch;
 
+        private bool interrupted = false;
+
         // delgates to make thread safe control calls
         private delegate void SetLabelTextCallBack(Label label, string text);
         private delegate void SetTrackbarCallBack(TrackBar bar, int pos);
@@ -267,7 +269,6 @@ namespace MCIRecorder
             }
             catch (ThreadInterruptedException interrupt)
             {
-                //ThreadSafeUpdateTrackbarValue(soundTrackBar, _playbackLenMillis);
             }
         }
         # endregion
@@ -394,10 +395,10 @@ namespace MCIRecorder
             // change play button status, update play button text, update
             // status label and reset all sessions
             mciSendString("stop sound", null, 0, IntPtr.Zero);
+            ResetSession();
             _playButtonStatus = Status.Idle;
             playButton.Text = "Play";
             statusLabel.Text = "Ready.";
-            ResetSession();
         }
 
         /// <summary>
@@ -576,7 +577,7 @@ namespace MCIRecorder
                         ResetTrackbar(soundTrackBar.Maximum);
                         break;
                     case MCI_NOTIFY_ABORTED:
-                        //MessageBox.Show("aborted");
+                        ResetTrackbar(0);
                         break;
                     default:
                         MessageBox.Show("other error");
