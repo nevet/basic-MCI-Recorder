@@ -110,6 +110,7 @@ namespace MCIRecorder
         private void ResetTimer()
         {
             _timerCnt = 0;
+            timerLabel.Text = "00:00:00";
             if (_timer != null)
             {
                 _timer.Dispose();
@@ -266,7 +267,7 @@ namespace MCIRecorder
             }
             catch (ThreadInterruptedException interrupt)
             {
-                ThreadSafeUpdateTrackbarValue(soundTrackBar, _playbackLenMillis);
+                //ThreadSafeUpdateTrackbarValue(soundTrackBar, _playbackLenMillis);
             }
         }
         # endregion
@@ -390,9 +391,11 @@ namespace MCIRecorder
         /// </summary>
         private void StopButtonPlayingHandler()
         {
-            // change rec button status, update status label and reset all
-            // sessions
+            // change play button status, update play button text, update
+            // status label and reset all sessions
+            mciSendString("stop sound", null, 0, IntPtr.Zero);
             _playButtonStatus = Status.Idle;
+            playButton.Text = "Play";
             statusLabel.Text = "Ready.";
             ResetSession();
         }
@@ -573,7 +576,7 @@ namespace MCIRecorder
                         ResetTrackbar(soundTrackBar.Maximum);
                         break;
                     case MCI_NOTIFY_ABORTED:
-                        MessageBox.Show("aborted");
+                        //MessageBox.Show("aborted");
                         break;
                     default:
                         MessageBox.Show("other error");
