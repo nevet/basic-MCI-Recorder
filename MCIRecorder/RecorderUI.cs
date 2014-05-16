@@ -42,6 +42,7 @@ namespace MCIRecorder
         private int _timerCnt;
 
         private Status _recButtonStatus;
+        private Status _playButtonStatus;
 
         private System.Threading.Timer _timer;
         private Thread _trackbarThread;
@@ -79,7 +80,10 @@ namespace MCIRecorder
                 _timer.Dispose();
             }
 
-            _trackbarThread.Abort();
+            if (_trackbarThread != null && _trackbarThread.IsAlive)
+            {
+                _trackbarThread.Abort();
+            }
         }
 
         # region Helper Functions
@@ -97,6 +101,7 @@ namespace MCIRecorder
             playButton.Text = "Play";
 
             _recButtonStatus = Status.Idle;
+            _playButtonStatus = Status.Idle;
         }
 
         /// <summary>
@@ -121,6 +126,11 @@ namespace MCIRecorder
             if (_trackbarThread != null && _trackbarThread.IsAlive)
             {
                 _trackbarThread.Interrupt();
+            }
+
+            if (_stopwatch != null)
+            {
+                _stopwatch.Reset();
             }
 
             soundTrackBar.Value = soundBarDefaultPos;
@@ -235,7 +245,14 @@ namespace MCIRecorder
 
         private void TrackbarEvent(Object o)
         {
-            _stopwatch = Stopwatch.StartNew();
+            if (_stopwatch == null)
+            {
+                _stopwatch = Stopwatch.StartNew();
+            }
+            else
+            {
+                _stopwatch.Start();
+            }
 
             try
             {
@@ -254,6 +271,7 @@ namespace MCIRecorder
         }
         # endregion
 
+        # region Button Event Handlers
         /// <summary>
         /// Handler handles the click event when the button is at idle state.
         /// Note: The routine will reset all other sessions.
@@ -268,6 +286,8 @@ namespace MCIRecorder
             statusLabel.Text = "Recording...";
             statusLabel.Visible = true;
             recButton.Text = "Pause";
+            // disable control of playing
+            playButton.Enabled = false;
 
             // change the status to recording status and change the button text
             // to pause
@@ -328,6 +348,150 @@ namespace MCIRecorder
             _timer = new System.Threading.Timer(TimerEvent, null, _resumeWaitingTime, 1000);
         }
 
+        /// <summary>
+        /// Handler handles click event when sound is recording. It will save
+        /// the sound to a user-specified path.
+        /// </summary>
+        private void StopButtonRecordingHandler()
+        {
+            // enable the control of play button
+            playButton.Enabled = true;
+
+            // change rec button status, update status label and stop timer
+            _recButtonStatus = Status.Idle;
+            statusLabel.Text = "Ready.";
+            ResetTimer();
+
+            // stop recording and get the length of the recording
+            mciSendString("stop sound", null, 0, IntPtr.Zero);
+            mciSendString("status sound length", mciRetInfo, MCI_RET_INFO_BUF_LEN, IntPtr.Zero);
+
+            // adjust the stop time difference between timer-stop and recording-stop
+            timerLabel.Text = ConvertMillisToTime(int.Parse(mciRetInfo.ToString()));
+
+            // save the recording
+            SaveFileDialog save = new SaveFileDialog();
+            save.Filter = "wave|*.wav";
+
+            if (save.ShowDialog() == DialogResult.OK)
+            {
+                mciSendString("save sound " + save.FileName, null, 0, IntPtr.Zero);
+                mciSendString("close sound", null, 0, IntPtr.Zero);
+            }
+            else
+            {
+                MessageBox.Show("Cannot save the record.");
+            }
+        }
+
+        /// <summary>
+        /// Handler handles click event when the sound is playing back. It will
+        /// stop the sound and reset all settings.
+        /// </summary>
+        private void StopButtonPlayingHandler()
+        {
+            // change rec button status, update status label and reset all
+            // sessions
+            _playButtonStatus = Status.Idle;
+            statusLabel.Text = "Ready.";
+            ResetSession();
+        }
+
+        /// <summary>
+        /// Handler handles click event when idle.
+        /// </summary>
+        private void PlayButtonIdleHandler()
+        {
+            // close unfinished session
+            ResetSession();
+
+            // if no sound has been loaded yet, load the sound
+            if (_curPlayBack == "")
+            {
+                OpenFileDialog open = new OpenFileDialog();
+                open.Filter = "wave|*.wav";
+
+                if (open.ShowDialog() == DialogResult.OK)
+                {
+                    _curPlayBack = open.FileName;
+                }
+            }
+
+            // UI settings
+            ResetUI();
+            statusLabel.Text = "Playing...";
+            statusLabel.Visible = true;
+
+            // change the button status and change the button text
+            _playButtonStatus = Status.Playing;
+            playButton.Text = "Pause";
+
+            // get play back length
+            mciSendString("open \"" + _curPlayBack + "\" alias sound", null, 0, IntPtr.Zero);
+            mciSendString("status sound length", mciRetInfo, MCI_RET_INFO_BUF_LEN, IntPtr.Zero);
+            _playbackLenMillis = int.Parse(mciRetInfo.ToString());
+            //System.Console.WriteLine("total len" + _playbackLenMillis);
+
+            // start the timer and track bar
+            _playbackTimeCnt = 0;
+            _timerCnt = 0;
+            _timer = new System.Threading.Timer(TimerEvent, null, 0, 1000);
+            _trackbarThread = new Thread(TrackbarEvent);
+            _trackbarThread.Start();
+
+            // start play back
+            mciSendString("play sound notify", null, 0, this.Handle);
+        }
+
+        /// <summary>
+        /// Handler handles click event when the sound is playing. It pauses
+        /// the sound, timer and track bar.
+        /// </summary>
+        private void PlayButtonPlayingHandler()
+        {
+            // change the status to pause and change the text to resume
+            _playButtonStatus = Status.Pause;
+            playButton.Text = "Resume";
+
+            // pause the sound, timer and trackbar
+            mciSendString("pause sound", null, 0, IntPtr.Zero);
+            _timer.Dispose();
+            _stopwatch.Stop();
+            _trackbarThread.Interrupt();
+
+            // since the timer is counting in seconds, we need to know how many
+            // millis to wait before next integral second.
+
+            // retrieve current length
+            mciSendString("status sound position", mciRetInfo, MCI_RET_INFO_BUF_LEN, IntPtr.Zero);
+            int currentLen = int.Parse(mciRetInfo.ToString());
+            _resumeWaitingTime = _timerCnt * 1000 - currentLen;
+
+            if (_resumeWaitingTime < 0)
+            {
+                _resumeWaitingTime = 0;
+            }
+        }
+
+        /// <summary>
+        /// Handler handles click event when the sound is paused. It resumes
+        /// the sound, timer and track bar.
+        /// </summary>
+        private void PlayButtonPauseHandler()
+        {
+            // change the status to playing and change the button text to
+            // pause
+            _playButtonStatus = Status.Playing;
+            playButton.Text = "Pause";
+
+            // resume recording, restart the timer and continue the track bar
+            mciSendString("resume sound", null, 0, IntPtr.Zero);
+            _timer = new System.Threading.Timer(TimerEvent, null, _resumeWaitingTime, 1000);
+            _trackbarThread = new Thread(TrackbarEvent);
+            _trackbarThread.Start();
+        }
+        # endregion
+
         # region UI Control Events
         private void RecButtonClick(object sender, EventArgs e)
         {
@@ -350,70 +514,39 @@ namespace MCIRecorder
 
         private void StopButtonClick(object sender, EventArgs e)
         {
-            // stop timer, update status label and change rec button status
-            _recButtonStatus = Status.Idle;
-            statusLabel.Text = "Ready.";
-            ResetTimer();
-
-            // stop recording and get the length of the recording
-            mciSendString("stop sound", null, 0, IntPtr.Zero);
-            mciSendString("status sound length", mciRetInfo, MCI_RET_INFO_BUF_LEN, IntPtr.Zero);
-            
-            // adjust the stop time difference between timer-stop and recording-stop
-            timerLabel.Text = ConvertMillisToTime(int.Parse(mciRetInfo.ToString()));
-
-            // save the recording
-            SaveFileDialog save = new SaveFileDialog();
-            save.Filter = "wave|*.wav";
-
-            if (save.ShowDialog() == DialogResult.OK)
+            if (_recButtonStatus == Status.Recording ||
+                _recButtonStatus == Status.Pause)
             {
-                mciSendString("save sound " + save.FileName, null, 0, IntPtr.Zero);
-                mciSendString("close sound", null, 0, IntPtr.Zero);
+                StopButtonRecordingHandler();
+            } else
+            if (_playButtonStatus == Status.Playing ||
+                _playButtonStatus == Status.Pause)
+            {
+                StopButtonPlayingHandler();
             }
             else
             {
-                MessageBox.Show("Cannot save the record.");
+                MessageBox.Show("Invalid Operation");
             }
         }
 
         private void PlayButtonClick(object sender, EventArgs e)
         {
-            // close unfinished session
-            ResetSession();
-
-            // if no sound has been loaded yet, load the sound
-            if (_curPlayBack == "")
+            switch (_playButtonStatus)
             {
-                OpenFileDialog open = new OpenFileDialog();
-                open.Filter = "wave|*.wav";
-
-                if (open.ShowDialog() == DialogResult.OK)
-                {
-                    _curPlayBack = open.FileName;
-                }
+                case Status.Idle:
+                    PlayButtonIdleHandler();
+                    break;
+                case Status.Playing:
+                    PlayButtonPlayingHandler();
+                    break;
+                case Status.Pause:
+                    PlayButtonPauseHandler();
+                    break;
+                default:
+                    MessageBox.Show("Invalid Operation");
+                    break;
             }
-
-            // get play back length
-            mciSendString("open \"" + _curPlayBack + "\" alias sound", null, 0, IntPtr.Zero);
-            mciSendString("status sound length", mciRetInfo, MCI_RET_INFO_BUF_LEN, IntPtr.Zero);
-            _playbackLenMillis = int.Parse(mciRetInfo.ToString());
-            //System.Console.WriteLine("total len" + _playbackLenMillis);
-            
-            // UI settings
-            ResetUI();
-            statusLabel.Text = "Play Back...";
-            statusLabel.Visible = true;
-
-            // start the timer and track bar
-            _playbackTimeCnt = 0;
-            _timerCnt = 0;
-            _timer = new System.Threading.Timer(TimerEvent, null, 0, 1000);
-            _trackbarThread = new Thread(TrackbarEvent);
-            _trackbarThread.Start();
-            
-            // start play back
-            mciSendString("play sound notify", null, 0, this.Handle);
         }
         # endregion
 
@@ -431,13 +564,13 @@ namespace MCIRecorder
                     case MCI_NOTIFY_SUCCESS:
                         // UI settings
                         statusLabel.Text = "Ready.";
-                        playButton.Text = "Play Aagin";
+                        playButton.Text = "Play";
+                        _playButtonStatus = Status.Idle;
                         
-                        // dispose timer and track bar timers
+                        // dispose timer and track bar timer while setting the
+                        // track bar to full
                         _timer.Dispose();
-                        _trackbarThread.Interrupt();
-                        soundTrackBar.Value = soundTrackBar.Maximum;
-
+                        ResetTrackbar(soundTrackBar.Maximum);
                         break;
                     case MCI_NOTIFY_ABORTED:
                         MessageBox.Show("aborted");
