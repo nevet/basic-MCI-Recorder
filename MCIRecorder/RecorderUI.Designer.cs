@@ -38,6 +38,7 @@
             this.recNumber = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.recName = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.recLength = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.recDate = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             ((System.ComponentModel.ISupportInitialize)(this.soundTrackBar)).BeginInit();
             this.SuspendLayout();
             // 
@@ -105,8 +106,12 @@
             this.recDisplay.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.recNumber,
             this.recName,
-            this.recLength});
+            this.recLength,
+            this.recDate});
+            this.recDisplay.FullRowSelect = true;
+            this.recDisplay.HideSelection = false;
             this.recDisplay.Location = new System.Drawing.Point(14, 138);
+            this.recDisplay.MultiSelect = false;
             this.recDisplay.Name = "recDisplay";
             this.recDisplay.Size = new System.Drawing.Size(253, 191);
             this.recDisplay.TabIndex = 6;
@@ -120,13 +125,18 @@
             // 
             // recName
             // 
-            this.recName.Text = "Record Name";
-            this.recName.Width = 102;
+            this.recName.Text = "Name";
+            this.recName.Width = 47;
             // 
             // recLength
             // 
-            this.recLength.Text = "Record Length";
-            this.recLength.Width = 99;
+            this.recLength.Text = "Length";
+            this.recLength.Width = 68;
+            // 
+            // recDate
+            // 
+            this.recDate.Text = "Record Date";
+            this.recDate.Width = 81;
             // 
             // RecorderUI
             // 
@@ -165,6 +175,7 @@
         private System.Windows.Forms.ColumnHeader recNumber;
         private System.Windows.Forms.ColumnHeader recName;
         private System.Windows.Forms.ColumnHeader recLength;
+        private System.Windows.Forms.ColumnHeader recDate;
     }
 }
 

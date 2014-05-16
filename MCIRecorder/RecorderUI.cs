@@ -188,9 +188,36 @@ namespace MCIRecorder
 
         private void UpdateRecordList(string length)
         {
+            // add the latest record to the list
             ListViewItem item = recDisplay.Items.Add(_curRecNumber.ToString());
             item.SubItems.Add("Rec" + _curRecNumber.ToString());
             item.SubItems.Add(length);
+            item.SubItems.Add(DateTime.Now.ToString());
+
+            // and select it by default
+            recDisplay.Items[_curRecNumber - 1].Selected = true;
+        }
+
+        private void LoadPlayback()
+        {
+            int selected = -1;
+
+            for (int i = 0; i < _curRecNumber; i ++)
+            {
+                if (recDisplay.Items[i].Selected)
+                {
+                    selected = i;
+                    break;
+                }
+            }
+
+            if (selected == -1)
+            {
+                selected = _curRecNumber - 1;
+                recDisplay.Items[selected].Selected = true;
+            }
+
+            _curPlayBack = TempPath + "/Rec" + selected.ToString() + ".wav";
         }
         # endregion
 
@@ -417,17 +444,19 @@ namespace MCIRecorder
             // close unfinished session
             ResetSession();
 
-            // if no sound has been loaded yet, load the sound
-            if (_curPlayBack == "")
-            {
-                OpenFileDialog open = new OpenFileDialog();
-                open.Filter = "wave|*.wav";
+            //// if no sound has been loaded yet, load the sound
+            //if (_curPlayBack == "")
+            //{
+            //    OpenFileDialog open = new OpenFileDialog();
+            //    open.Filter = "wave|*.wav";
 
-                if (open.ShowDialog() == DialogResult.OK)
-                {
-                    _curPlayBack = open.FileName;
-                }
-            }
+            //    if (open.ShowDialog() == DialogResult.OK)
+            //    {
+            //        _curPlayBack = open.FileName;
+            //    }
+            //}
+            // load play back record
+            LoadPlayback();
 
             // UI settings
             ResetUI();
@@ -560,6 +589,7 @@ namespace MCIRecorder
                     break;
             }
         }
+
         # endregion
 
         /// <summary>
