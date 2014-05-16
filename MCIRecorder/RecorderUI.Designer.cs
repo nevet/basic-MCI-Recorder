@@ -112,7 +112,8 @@
             this.MinimizeBox = false;
             this.Name = "RecorderUI";
             this.Text = "MCIRecorder";
-            this.Load += new System.EventHandler(this.RecorderUILoad);
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.RecorderUI_FormClosing);
+            this.Load += new System.EventHandler(this.RecorderUI_Load);
             ((System.ComponentModel.ISupportInitialize)(this.soundTrackBar)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();

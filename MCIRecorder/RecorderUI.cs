@@ -62,11 +62,24 @@ namespace MCIRecorder
             mciRetInfo = new StringBuilder(MCI_RET_INFO_BUF_LEN);
         }
 
-        private void RecorderUILoad(object sender, EventArgs e)
+        private void RecorderUI_Load(object sender, EventArgs e)
         {
             statusLabel.Text = "Ready.";
             statusLabel.Visible = true;
             ResetUI();
+        }
+
+        private void RecorderUI_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            // before closing, clean up all unfinished sessions
+            mciSendString("close sound", null, 0, IntPtr.Zero);
+
+            if (_timer != null)
+            {
+                _timer.Dispose();
+            }
+
+            _trackbarThread.Abort();
         }
 
         # region Helper Functions
