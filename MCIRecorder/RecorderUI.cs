@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -49,7 +50,9 @@ namespace MCIRecorder
 
         private Stopwatch _stopwatch;
 
-        private bool interrupted = false;
+        // Records save and display
+        private const string TempPath = "temp";//Path.GetTempPath();
+        private int _curRecNumber;
 
         // delgates to make thread safe control calls
         private delegate void SetLabelTextCallBack(Label label, string text);
@@ -69,6 +72,7 @@ namespace MCIRecorder
         {
             statusLabel.Text = "Ready.";
             statusLabel.Visible = true;
+            _curRecNumber = 0;
             ResetUI();
         }
 
@@ -180,6 +184,13 @@ namespace MCIRecorder
         private string ConvertMillisToTime(int millis)
         {
             return ConvertMillisToTime((long) millis);
+        }
+
+        private void UpdateRecordList(string length)
+        {
+            ListViewItem item = recDisplay.Items.Add(_curRecNumber.ToString());
+            item.SubItems.Add("Rec" + _curRecNumber.ToString());
+            item.SubItems.Add(length);
         }
         # endregion
 
@@ -359,8 +370,10 @@ namespace MCIRecorder
             // enable the control of play button
             playButton.Enabled = true;
 
-            // change rec button status, update status label and stop timer
+            // change rec button status, rec button text, update status label
+            // and stop timer
             _recButtonStatus = Status.Idle;
+            recButton.Text = "Record";
             statusLabel.Text = "Ready.";
             ResetTimer();
 
@@ -368,22 +381,17 @@ namespace MCIRecorder
             mciSendString("stop sound", null, 0, IntPtr.Zero);
             mciSendString("status sound length", mciRetInfo, MCI_RET_INFO_BUF_LEN, IntPtr.Zero);
 
+            int recLength = int.Parse(mciRetInfo.ToString());
             // adjust the stop time difference between timer-stop and recording-stop
-            timerLabel.Text = ConvertMillisToTime(int.Parse(mciRetInfo.ToString()));
+            timerLabel.Text = ConvertMillisToTime(recLength);
 
-            // save the recording
-            SaveFileDialog save = new SaveFileDialog();
-            save.Filter = "wave|*.wav";
+            string saveName = TempPath + "/Rec" + _curRecNumber.ToString() + ".wav";
+            _curRecNumber++;
+            mciSendString("save sound " + saveName, null, 0, IntPtr.Zero);
+            mciSendString("close sound", null, 0, IntPtr.Zero);
 
-            if (save.ShowDialog() == DialogResult.OK)
-            {
-                mciSendString("save sound " + save.FileName, null, 0, IntPtr.Zero);
-                mciSendString("close sound", null, 0, IntPtr.Zero);
-            }
-            else
-            {
-                MessageBox.Show("Cannot save the record.");
-            }
+            // update record list
+            UpdateRecordList(timerLabel.Text);
         }
 
         /// <summary>
