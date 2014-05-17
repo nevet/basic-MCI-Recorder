@@ -198,9 +198,15 @@ namespace MCIRecorder
             recDisplay.Items[_curRecNumber - 1].Selected = true;
         }
 
-        private void LoadPlayback()
+        private bool LoadPlayback()
         {
             int selected = -1;
+
+            // if no record is found, return false
+            if (_curRecNumber == 0)
+            {
+                return false;
+            }
 
             for (int i = 0; i < _curRecNumber; i ++)
             {
@@ -218,6 +224,8 @@ namespace MCIRecorder
             }
 
             _curPlayBack = TempPath + "/Rec" + selected.ToString() + ".wav";
+
+            return true;
         }
         # endregion
 
@@ -444,44 +452,37 @@ namespace MCIRecorder
             // close unfinished session
             ResetSession();
 
-            //// if no sound has been loaded yet, load the sound
-            //if (_curPlayBack == "")
-            //{
-            //    OpenFileDialog open = new OpenFileDialog();
-            //    open.Filter = "wave|*.wav";
+            if (!LoadPlayback())
+            {
+                MessageBox.Show("No record to play back. Please record first.");
+            }
+            else
+            {
+                // UI settings
+                ResetUI();
+                statusLabel.Text = "Playing...";
+                statusLabel.Visible = true;
 
-            //    if (open.ShowDialog() == DialogResult.OK)
-            //    {
-            //        _curPlayBack = open.FileName;
-            //    }
-            //}
-            // load play back record
-            LoadPlayback();
+                // change the button status and change the button text
+                _playButtonStatus = Status.Playing;
+                playButton.Text = "Pause";
 
-            // UI settings
-            ResetUI();
-            statusLabel.Text = "Playing...";
-            statusLabel.Visible = true;
+                // get play back length
+                mciSendString("open \"" + _curPlayBack + "\" alias sound", null, 0, IntPtr.Zero);
+                mciSendString("status sound length", mciRetInfo, MCI_RET_INFO_BUF_LEN, IntPtr.Zero);
+                _playbackLenMillis = int.Parse(mciRetInfo.ToString());
+                //System.Console.WriteLine("total len" + _playbackLenMillis);
 
-            // change the button status and change the button text
-            _playButtonStatus = Status.Playing;
-            playButton.Text = "Pause";
+                // start the timer and track bar
+                _playbackTimeCnt = 0;
+                _timerCnt = 0;
+                _timer = new System.Threading.Timer(TimerEvent, null, 0, 1000);
+                _trackbarThread = new Thread(TrackbarEvent);
+                _trackbarThread.Start();
 
-            // get play back length
-            mciSendString("open \"" + _curPlayBack + "\" alias sound", null, 0, IntPtr.Zero);
-            mciSendString("status sound length", mciRetInfo, MCI_RET_INFO_BUF_LEN, IntPtr.Zero);
-            _playbackLenMillis = int.Parse(mciRetInfo.ToString());
-            //System.Console.WriteLine("total len" + _playbackLenMillis);
-
-            // start the timer and track bar
-            _playbackTimeCnt = 0;
-            _timerCnt = 0;
-            _timer = new System.Threading.Timer(TimerEvent, null, 0, 1000);
-            _trackbarThread = new Thread(TrackbarEvent);
-            _trackbarThread.Start();
-
-            // start play back
-            mciSendString("play sound notify", null, 0, this.Handle);
+                // start play back
+                mciSendString("play sound notify", null, 0, this.Handle);
+            }
         }
 
         /// <summary>
@@ -611,8 +612,8 @@ namespace MCIRecorder
                         
                         // dispose timer and track bar timer while setting the
                         // track bar to full
-                        _timer.Dispose();
-                        ResetTrackbar(soundTrackBar.Maximum);
+                        ResetSession();
+                        soundTrackBar.Value = soundTrackBar.Maximum;
                         break;
                     case MCI_NOTIFY_ABORTED:
                         ResetTrackbar(0);
