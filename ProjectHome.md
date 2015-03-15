@@ -1,0 +1,1 @@
+Simple WinForm based recorder written in C#. Using Winmm.dll as audio helper.
